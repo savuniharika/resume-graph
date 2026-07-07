@@ -1,29 +1,39 @@
 import os
-from dotenv import load_dotenv
+from typing import TypedDict, List
 import google.generativeai as genai
-load_dotenv()
 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
-model = genai.GenerativeModel("gemini-2.5-flash")
-from typing import TypedDict
 from langgraph.graph import StateGraph, START, END
 
-# Define the state
+# -------------------------
+# Gemini Setup
+# -------------------------
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+
+# -------------------------
+# State
+# -------------------------
 class ResumeState(TypedDict):
     resume: str
     analysis: str
-    questions:str
-    answer:str
-    evaluation:str
+    questions: List[str]
+    answer: str
+    evaluation: str
 
-# Analyze resume
+
+# -------------------------
+# Node 1: Analyze Resume
+# -------------------------
 def analyze_resume(state: ResumeState):
-    print("Analyzing resume...")
-
     prompt = f"""
-    Analyze this resume:
-    {state["resume"]}
+    Analyze the resume and extract:
+    - Skills
+    - Strengths
+    - Weaknesses
+
+    Resume:
+    {state['resume']}
     """
 
     response = model.generate_content(prompt)
@@ -31,115 +41,67 @@ def analyze_resume(state: ResumeState):
     return {"analysis": response.text}
 
 
-# generate questions
+# -------------------------
+# Node 2: Generate Questions
+# -------------------------
 def generate_questions(state: ResumeState):
-    print("Generating interview questions...")
-
     prompt = f"""
-    Based on the candidate profile below:
+    Based on this resume analysis, generate 5 technical interview questions.
 
-    {state["analysis"]}
+    Analysis:
+    {state['analysis']}
 
-    Generate exactly 5 interview questions.
-
-    For each question provide:
-
-    Question:
-    Ideal Answer:
-    Difficulty (Easy/Medium/Hard)
-
-    Format:
-
-    Question 1:
-    ...
-
-    Ideal Answer:
-    ...
-
-    Difficulty:
-    ...
-
-    Repeat the same format for all 5 questions.
+    Return as a numbered list.
     """
 
     response = model.generate_content(prompt)
 
-    state["questions"] = response.text
+    questions = response.text.split("\n")
 
-    return state
+    return {"questions": questions}
 
 
-# evaluate answers
+# -------------------------
+# Node 3: Evaluate Answer
+# -------------------------
 def evaluate_answer(state: ResumeState):
-    print("Evaluating answer...")
-
     prompt = f"""
-    You are an AI interviewer.
+    You are an interviewer.
 
-    These are the interview questions and their ideal answers:
+    Resume Analysis:
+    {state['analysis']}
 
-    {state["questions"]}
+    Questions:
+    {state['questions']}
 
-    Candidate's answer:
+    Candidate Answer:
+    {state['answer']}
 
-    {state["answer"]}
-
-    Compare the candidate's answer with the ideal answer.
-
-    Provide:
-
-    Score: /10
-
-    Strengths:
-    - ...
-
-    Weaknesses:
-    - ...
-
-    Suggestions:
-    - ...
+    Give:
+    - Score out of 10
+    - Feedback
     """
 
     response = model.generate_content(prompt)
 
-    state["evaluation"] = response.text
-
-    return state
+    return {"evaluation": response.text}
 
 
 # -------------------------
-# Create the graph
+# Build Graph
 # -------------------------
-# -------------------------
-# Create the graph
-# -------------------------
-
 builder = StateGraph(ResumeState)
 
 # Add nodes
 builder.add_node("analyze_resume", analyze_resume)
 builder.add_node("generate_questions", generate_questions)
-builder.add_node("evaluate_answer",evaluate_answer)
+builder.add_node("evaluate_answer", evaluate_answer)
 
-# Connect flow
+# Add edges (FLOW)
 builder.add_edge(START, "analyze_resume")
 builder.add_edge("analyze_resume", "generate_questions")
 builder.add_edge("generate_questions", "evaluate_answer")
-builder.add_edge("evaluate_answer",END)
+builder.add_edge("evaluate_answer", END)
 
 # Compile graph
 graph = builder.compile()
-# Run graph
-result = graph.invoke({
-    "resume": "I am an EEE student interested in AI and Python.",
-    "answer":"i know python basics and i have done a small AI project using sklearn."
-})
-
-print("\n===== ANALYSIS =====\n")
-print(result["analysis"])
-
-print("\n===== QUESTIONS =====\n")
-print(result["questions"])
-
-print("\n====EVALUATION====\n")
-print(result["evaluation"])
