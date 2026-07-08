@@ -10,26 +10,25 @@ from langgraph.graph import StateGraph, END
 # -----------------------------
 # Load API Key
 # -----------------------------
+# Load local .env if present
+load_dotenv()
+
 api_key = None
 
+# Try Streamlit Secrets first
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
 except Exception:
     pass
 
+# Fall back to local .env / environment variable
 if not api_key:
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-
-    if env_path.exists():
-        load_dotenv(env_path)
-
     api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
     raise ValueError("GOOGLE_API_KEY not found")
 
 genai.configure(api_key=api_key)
-
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 
