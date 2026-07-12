@@ -1,34 +1,33 @@
 import os
-from pathlib import Path
-from typing import TypedDict
 import re
+from typing import TypedDict
+
 import streamlit as st
-from dotenv import load_dotenv
 import google.generativeai as genai
+from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 
 # -----------------------------
 # Load API Key
 # -----------------------------
-# Load local .env if present
+
+# Load .env only if it exists (for local development)
 load_dotenv()
 
-api_key = None
-
 # Try Streamlit Secrets first
-try:
-    api_key = st.secrets["GOOGLE_API_KEY"]
-except Exception:
-    pass
+api_key = st.secrets.get("GOOGLE_API_KEY", None)
 
-# Fall back to local .env / environment variable
+# If not found, use .env
 if not api_key:
     api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    raise ValueError("GOOGLE_API_KEY not found")
+    raise ValueError(
+        "GOOGLE_API_KEY not found. Add it to Streamlit Secrets or your local .env file."
+    )
 
 genai.configure(api_key=api_key)
+
 model = genai.GenerativeModel("gemini-2.5-flash")
 
 
